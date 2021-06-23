@@ -13,7 +13,7 @@ from scipy.stats import linregress
 
 #%%#####################################COPR#####################################
 # Import Data set
-COPR_data = pd.read_excel('COPR_climate2.xlsx')
+COPR_data = pd.read_excel(r'/Users/mariawarter/Box Sync/PhD/PhD/Python/Data/COPR_climate.xlsx')
 COPR_data.rename(columns={'TIMESTAMP': 'Date'}, inplace=True)
 
 #Convert Date to Index
@@ -22,7 +22,7 @@ COPR_data=COPR_data.set_index(pd.DatetimeIndex(COPR_data['Date']))
 # Convert UTC to PST
 COPR_data=COPR_data.tz_localize('UTC')
 COPR_data=COPR_data.tz_convert('US/Pacific')
-COPR_data = COPR_data[(COPR_data.index > '2008-01-01')]
+COPR_data = COPR_data[(COPR_data.index > '2007-10-01')] #changed to include WY 2008 for P
 
 COPR_data[COPR_data == 'NAN'] = np.nan
 
@@ -30,20 +30,20 @@ for col in list(COPR_data.columns):
         COPR_data[col] = pd.to_numeric(COPR_data[col])
 COPR_data['Date'] = pd.to_datetime(COPR_data['Date'])
 #%% Import PET from ET dataframe
-COPR_PET = pd.read_csv('ET_COPR.csv', sep='\t')
-COPR_PET['Date'] = pd.to_datetime(COPR_PET['Date'], utc=True)
-COPR_PET=COPR_PET.set_index(pd.DatetimeIndex(COPR_PET['Date'])) 
+COPR_PET = pd.read_csv(r'/Users/mariawarter/Box Sync/PhD/PhD/Python/Data/RET_COPR_03032021.csv',dayfirst=True,parse_dates=True,sep=';',index_col=(0))
+COPR_PET.index=pd.to_datetime(COPR_PET.index)
+COPR_PET['Date'] = pd.to_datetime(COPR_PET.index)
+
 COPR_PET = COPR_PET.resample('M').sum() 
-COPR_PET.loc['2017-10-31'] = 61.8904
+#COPR_PET.loc['2017-10-31'] = 61.8904
 
 #COPR_PET = COPR_PET.mask(COPR_PET['PET'].between(0, 0.01))
 #COPR_PET = (COPR_PET.ffill()+COPR_PET.bfill())/2
 #COPR_PET = COPR_PET.bfill().ffill()
-COPR_PET = COPR_PET.loc['2008-01-01' : ]
 COPR_PET['Site']='COPR'
 #%%################AIRSTRIP#####################################################
 
-Air_data = pd.read_excel('AIRS_climate2.xlsx')
+Air_data = pd.read_excel(r'/Users/mariawarter/Box Sync/PhD/PhD/Python/Data/AIRS_climate2.xlsx')
 
 Air_data.rename(columns={'TIMESTAMP': 'Date'}, inplace=True)
 
@@ -53,7 +53,7 @@ Air_data=Air_data.set_index(pd.DatetimeIndex(Air_data['Date']))
 # Convert UTC to PST
 Air_data=Air_data.tz_localize('UTC')
 Air_data=Air_data.tz_convert('US/Pacific')
-Air_data = Air_data[(Air_data.index > '2008-01-01')]
+Air_data = Air_data[(Air_data.index > '2007-10-01')]
 
 Air_data[Air_data == 'NAN'] = np.nan
  
@@ -64,21 +64,25 @@ Air_data['Date'] = pd.to_datetime(Air_data['Date'])
 
 #Air_data.drop(Air_data.columns[20:71], axis=1, inplace=True)
 #%%
-Air_PET = pd.read_csv('ET_AIR.csv', sep='\t')
-Air_PET['Date'] = pd.to_datetime(Air_PET['Date'], utc=True)
-Air_PET=Air_PET.set_index(pd.DatetimeIndex(Air_PET['Date'])) 
-Air_PET = Air_PET.resample('M').sum()
-Air_PET = Air_PET.mask(Air_PET['PET'].between(0, 0.01))
-Air_PET = (Air_PET.ffill()+Air_PET.bfill())/2
-Air_PET = Air_PET.bfill().ffill()
+Air_PET = pd.read_csv(r'/Users/mariawarter/Box Sync/PhD/PhD/Python/Data/RET_AIR.csv', sep=';',dayfirst=True,parse_dates=True,index_col=(0))
+Air_PET.index=pd.to_datetime(Air_PET.index)
+Air_PET['Date'] = pd.to_datetime(Air_PET.index)
+Air_PET= Air_PET.resample('M').sum()
 
-Air_PET = Air_PET.loc['2008-01-01' : ]
+
+#Air_PET = Air_PET.mask(Air_PET['PET'].between(0, 0.01))
+#Air_PET = (Air_PET.ffill()+Air_PET.bfill())/2
+#Air_PET = Air_PET.bfill().ffill()
+
+
 Air_PET['Site']= 'AIRS'
 
 #%% Convert Data to Water year starting in October 2007 (=WY 2008) earliest start possible. 
 COPR_Rain = COPR_data[['Date', 'Rain_mm_Tot']]
-COPR_Rain = COPR_Rain.loc['2008-10-01':'2019-09-30']
+COPR_Rain = COPR_Rain.loc['2007-10-01':'2019-09-30']
 COPR_Rain = COPR_Rain.resample('M').sum()
+
+#COPR_Rain_M = COPR_Rain.resample('M').sum()
 
 COPR_Rain['Date'] = pd.to_datetime(COPR_Rain.index)
 COPR_Rain['Month'] = COPR_Rain.index.month
@@ -98,10 +102,15 @@ COPR_Rain_Y['Site'] = 'COPR'
 
 #%% Soil Moisture ALL - is not by water year 
 COPR_SM1= COPR_data[['SMwfv_1_Avg']]
+#COPR_SM2 = COPR_data[['SMwfv_2_Avg']]
 COPR_SM1.columns = ['SM 1']
-COPR_SM1 = COPR_SM1.loc['2008-01-01':]
+#COPR_SM2.columns = ['SM 2']
+
+COPR_SM1 = COPR_SM1.loc['2007-10-01':]
 #Monthly mean doesnt have water year 2
 COPR_SM1_M = COPR_SM1.resample('M').mean()
+#COPR_SM2_M = COPR_SM2.resample('M').mean()
+
 #COPR_SM1_D = COPR_SM1.resample('D').mean()
 COPR_SM1_M = (COPR_SM1_M.ffill()+COPR_SM1_M.bfill())/2
 COPR_SM1_M = COPR_SM1_M.bfill().ffill()
@@ -129,6 +138,7 @@ COPR_AT = COPR_AT.bfill().ffill()
 COPR_AT['Date'] = pd.to_datetime(COPR_AT.index)
 COPR_AT['Site'] = 'COPR'
 
+
 #%%Relative Humidity 
 COPR_RH = COPR_T[['RH_avg_2']]
 COPR_RH = COPR_RH.resample('D').mean()
@@ -143,7 +153,7 @@ COPR_RH['Site'] = 'COPR'
 #%%Convert to Water year starting October 2008
 Air_Rain = Air_data[['Date', 'Rain_mm_Tot']]
 Air_Rain = Air_Rain.resample('M').sum()
-Air_Rain = Air_Rain.loc['2008-10-01': '2019-09-30']
+Air_Rain = Air_Rain.loc['2007-10-01': '2019-09-30']
 
 Air_Rain['Date'] = pd.to_datetime(Air_Rain.index)
 Air_Rain['Month']=Air_Rain.index.month
@@ -173,7 +183,7 @@ Air_SM1_M['Date'] = pd.to_datetime(Air_SM1_M.index)
 Air_SM1_M['Site'] = 'AIRS'
 #%% Saturation of Soil Moisture in %
 
-por1=0.340
+por2=0.340
 Air_SM1_M['Saturation']= Air_SM1_M['SM 1']/por1
 wp=0.07
 Air_SM1_M['PAW']= Air_SM1_M['SM 1'] - wp
@@ -199,73 +209,145 @@ Air_RH.columns = ['RH']
 Air_RH = (Air_RH.ffill()+Air_RH.bfill())/2
 Air_RH = Air_RH.bfill().ffill()
 Air_RH['Date'] = pd.to_datetime(Air_RH.index)
-Air_RH = Air_RH.loc['2008-01-01':'2019-09-30']
+#Air_RH = Air_RH.loc['2008-01-01':'2019-09-30']
 Air_RH['Site'] = 'AIRS'
 
+#%%Separation into the 3 Drought periods 
+#Temperature 
+#No Drought - COPR
+at11=pd.concat([COPR_AT.loc['2010-01-26':'2012-02-14'],COPR_AT.loc['2019-02-19': ]])
+at11['Period']= 'ND'
+
+#No Drought - AIRS
+at21=pd.concat([Air_AT.loc['2010-01-26':'2012-02-14'],Air_AT.loc['2019-02-19': ]])
+at21['Period']= 'ND1'
+
+#Moderate Drought - COPR
+at12=pd.concat([COPR_AT.loc['2008-01-29':'2009-04-01'],COPR_AT.loc['2009-10-27':'2010-01-26' ], 
+                COPR_AT.loc['2012-02-14':'2013-04-30'], COPR_AT.loc['2017-03-01':'2018-01-23']])
+at12['Period']= 'MD'
+
+#Moderate Drought - AIRS
+at22=pd.concat([Air_AT.loc['2008-01-29':'2009-04-01'],Air_AT.loc['2009-10-27':'2010-01-26' ], 
+                Air_AT.loc['2012-02-14':'2013-04-30'], Air_AT.loc['2017-03-01':'2018-01-23']])
+at22['Period']= 'MD1'
+
+#Extreme Drought - COPR
+at13=pd.concat([COPR_AT.loc['2013-05-01':'2017-03-01'],COPR_AT.loc['2018-01-23':'2019-02-19'],
+                COPR_AT.loc['2007-05-01':'2008-01-29']])
+at13['Period']= 'ED'
+
+#Extreme Drought - AIRS
+at23=pd.concat([Air_AT.loc['2013-05-01':'2017-03-01'],Air_AT.loc['2018-01-23':'2019-02-19'],
+                Air_AT.loc['2007-05-01':'2008-01-29']])
+at23['Period']= 'ED1'
+
+AT= pd.concat([at11,at12,at13,at21,at22,at23], axis =0)
+#%%Relative Humidity 
+rh11=pd.concat([COPR_RH.loc['2010-01-26':'2012-02-14'],COPR_RH.loc['2019-02-19': ]])
+rh11['Period']= 'ND'
+
+#No Drought - AIRS
+rh21=pd.concat([Air_RH.loc['2010-01-26':'2012-02-14'],Air_RH.loc['2019-02-19': ]])
+rh21['Period']= 'ND1'
+
+#Moderate Drought - COPR
+rh12=pd.concat([COPR_RH.loc['2008-01-29':'2009-04-01'],COPR_RH.loc['2009-10-27':'2010-01-26' ], 
+                COPR_RH.loc['2012-02-14':'2013-04-30'], COPR_RH.loc['2017-03-01':'2018-01-23']])
+rh12['Period']= 'MD'
+
+#Moderate Drought - AIRS
+rh22=pd.concat([Air_RH.loc['2008-01-29':'2009-04-01'],Air_RH.loc['2009-10-27':'2010-01-26' ], 
+                Air_RH.loc['2012-02-14':'2013-04-30'], Air_RH.loc['2017-03-01':'2018-01-23']])
+rh22['Period']= 'MD1'
+
+#Extreme Drought - COPR
+rh13=pd.concat([COPR_RH.loc['2013-05-01':'2017-03-01'],COPR_RH.loc['2018-01-23':'2019-02-19'],
+                COPR_RH.loc['2007-05-01':'2008-01-29']])
+rh13['Period']= 'ED'
+
+#Extreme Drought - AIRS
+rh23=pd.concat([Air_RH.loc['2013-05-01':'2017-03-01'],Air_RH.loc['2018-01-23':'2019-02-19'],
+                Air_RH.loc['2007-05-01':'2008-01-29']])
+rh23['Period']= 'ED1'
+
+RH = pd.concat([rh11,rh12,rh13,rh21,rh22,rh23], axis =0)
+#%%potential ET
+pet11=pd.concat([COPR_PET.loc['2010-01-26':'2012-02-14'],COPR_PET.loc['2019-02-19': ]])
+pet11['Period']= 'ND'
+
+#No Drought - AIRS
+pet21=pd.concat([Air_PET.loc['2010-01-26':'2012-02-14'],Air_PET.loc['2019-02-19': ]])
+pet21['Period']= 'ND1'
+
+#Moderate Drought - COPR
+pet12=pd.concat([COPR_PET.loc['2008-01-29':'2009-04-01'],COPR_PET.loc['2009-10-27':'2010-01-26' ], 
+                COPR_PET.loc['2012-02-14':'2013-04-30'], COPR_PET.loc['2017-03-01':'2018-01-23']])
+pet12['Period']= 'MD'
+
+#Moderate Drought - AIRS
+pet22=pd.concat([Air_PET.loc['2008-01-29':'2009-04-01'],Air_PET.loc['2009-10-27':'2010-01-26' ], 
+                Air_PET.loc['2012-02-14':'2013-04-30'], Air_PET.loc['2017-03-01':'2018-01-23']])
+pet22['Period']= 'MD1'
+
+#Extreme Drought - COPR
+pet13=pd.concat([COPR_PET.loc['2013-05-01':'2017-03-01'],COPR_PET.loc['2018-01-23':'2019-02-19'],
+                COPR_PET.loc['2007-05-01':'2008-01-29']])
+pet13['Period']= 'ED'
+
+#Extreme Drought - AIRS
+pet23=pd.concat([Air_PET.loc['2013-05-01':'2017-03-01'],Air_PET.loc['2018-01-23':'2019-02-19'],
+                Air_PET.loc['2007-05-01':'2008-01-29']])
+pet23['Period']= 'ED1'
+
+PET = pd.concat([pet11,pet12,pet13,pet21,pet22,pet23], axis=0)
 #%%
-at1=COPR_AT.loc['2008-01-01':'2011-12-31']
-at1['Period']= 'PD'
-at2=COPR_AT.loc['2012-01-01':'2018-12-31']
-at2['Period']= 'D'
+rain11=pd.concat([COPR_Rain.loc['2010-01-26':'2012-02-14'],COPR_Rain.loc['2019-02-19': ]])
+rain11['Period']= 'ND'
 
-stats.mannwhitneyu(at1['AT2'],at2['AT2'])
-stats.ks_2samp(at1['AT2'],at2['AT2'])
+#No Drought - AIRS
+rain21=pd.concat([Air_Rain.loc['2010-01-26':'2012-02-14'],Air_Rain.loc['2019-02-19': ]])
+rain21['Period']= 'ND1'
 
-at3=Air_AT.loc['2008-01-01':'2011-12-31']
-at3['Period']= 'PD1'
-at4=Air_AT.loc['2012-01-01':'2018-12-31']
-at4['Period']= 'D1'
-AT= pd.concat([at1,at2,at3,at4], axis=0)
-#%%
-rh1=COPR_RH.loc['2008-01-01':'2011-12-31'] 
-rh1['Period']= 'PD'
-rh2=COPR_RH.loc['2012-01-01':'2018-12-31'] 
-rh2['Period']= 'D'
+#Moderate Drought - COPR
+rain12=pd.concat([COPR_Rain.loc['2008-01-29':'2009-04-01'],COPR_Rain.loc['2009-10-27':'2010-01-26' ], 
+                COPR_Rain.loc['2012-02-14':'2013-04-30'], COPR_Rain.loc['2017-03-01':'2018-01-23']])
+rain12['Period']= 'MD'
 
-rh3=Air_RH.loc['2008-01-01':'2011-12-31'] 
-rh3['Period']= 'PD1'
-rh4=Air_RH.loc['2012-01-01':'2018-12-31'] 
-rh4['Period']= 'D1'
+#Moderate Drought - AIRS
+rain22=pd.concat([Air_Rain.loc['2008-01-29':'2009-04-01'],Air_Rain.loc['2009-10-27':'2010-01-26' ], 
+                Air_Rain.loc['2012-02-14':'2013-04-30'], Air_Rain.loc['2017-03-01':'2018-01-23']])
+rain22['Period']= 'MD1'
 
-RH = pd.concat([rh1,rh2,rh3,rh4], axis =0)
-#%%
-pet1=COPR_PET.loc['2008-01-01':'2011-12-31']
-pet1['Period']= 'PD'
-pet2=COPR_PET.loc['2012-01-01':'2018-12-31']
-pet2['Period']= 'D'
+#Extreme Drought - COPR
+rain13=pd.concat([COPR_Rain.loc['2013-05-01':'2017-03-01'],COPR_Rain.loc['2018-01-23':'2019-02-19'],
+                COPR_Rain.loc['2007-05-01':'2008-01-29']])
+rain13['Period']= 'ED'
 
-pet3=Air_PET.loc['2008-01-01':'2011-12-31']
-pet3['Period']= 'PD1'
-pet4=Air_PET.loc['2012-01-01':'2018-12-31']
-pet4['Period']= 'D1'
-PET = pd.concat([pet1,pet2,pet3,pet4], axis=0)
-#%%
-rain1=COPR_Rain.loc['2008-01-01':'2011-12-31']
-rain1['Period']= 'PD'
-rain2=COPR_Rain.loc['2012-01-01':'2018-12-31']
-rain2['Period']= 'D'
+#Extreme Drought - AIRS
+rain23=pd.concat([Air_Rain.loc['2013-05-01':'2017-03-01'],Air_Rain.loc['2018-01-23':'2019-02-19'],
+                Air_Rain.loc['2007-05-01':'2008-01-29']])
+rain23['Period']= 'ED1'
 
-rain3=Air_Rain.loc['2008-01-01':'2011-12-31']
-rain3['Period']= 'PD1'
-rain4=Air_Rain.loc['2012-01-01':'2018-12-31']
-rain4['Period']= 'D1'
+#Rain = pd.concat([rain11,rain12,rain13,rain21,rain22,rain23], axis =0)
 
-Rain = pd.concat([rain1,rain2,rain3,rain4], axis =0)
-
-#%%P , T, RH, PET in one plot 
+#%%P , T, RH, PET in one plot - Violin Plot for Climate 
 #sns.set(style="whitegrid")
 fig = plt.figure()
 ax=fig.add_subplot(221)
 ax = sns.violinplot(x="Period", y="AT2", showmedians=True, data=AT,linewidth = 0.3,hue='Site', dodge=False)
-
+ax.legend(frameon=False,fontsize='small')
 ax1 = fig.add_subplot(222)
-ax1 = sns.violinplot(x='Period', y='RH',linewidth = 0.3,  data=RH, hue='Site', dodge=False)
+ax1 = sns.violinplot(x='Period', y='RH',showmedians=True,linewidth = 0.3,  data=RH, hue='Site', dodge=False)
+ax1.legend(frameon=False,fontsize='small')
 
 ax2 = fig.add_subplot(223)
-ax2 = sns.violinplot(x='Period', y='PET', linewidth = 0.3,data=PET,cut=0, hue='Site', dodge=False)
+ax2 = sns.violinplot(x='Period', y='PET',showmedians=True, linewidth = 0.3,data=PET,cut=0, hue='Site', dodge=False)
+ax2.legend(frameon=False,fontsize='small')
 
 ax3 = fig.add_subplot(224)
-ax3 = sns.violinplot(x='Period', y='Rain_mm_Tot',linewidth = 0.3, cut=0, data=Rain, hue='Site', dodge=False)
+ax3 = sns.violinplot(x='Period', y='Rain_mm_Tot',showmedians=True,linewidth = 0.3, cut=0, data=Rain, hue='Site', dodge=False)
+ax3.legend(frameon=False,fontsize='small')
 
 #%%
 
@@ -277,46 +359,81 @@ ax3 = sns.violinplot(x='Period', y='Rain_mm_Tot',linewidth = 0.3, cut=0, data=Ra
               
 #%% SM and NDVI in one plot, plus SM/ NDVI regression (extra)             
 
-sm1=COPR_SM1_M.loc['2008-01-01':'2011-12-31']
-sm1['Period']= 'PD'
-sm2=COPR_SM1_M.loc['2012-01-01':'2018-12-31']
-sm2['Period']= 'D'
+sm11=pd.concat([COPR_SM1_M.loc['2010-01-26':'2012-02-14'],COPR_SM1_M.loc['2019-02-19': ]])
+sm11['Period']= 'ND'
 
-sm3=Air_SM1_M.loc['2008-01-01':'2011-12-31']
-sm3['Period']= 'PD1'
-sm4=Air_SM1_M.loc['2012-01-01':'2018-12-31']
-sm4['Period']= 'D1'
-SM = pd.concat([sm1,sm2,sm3,sm4], axis=0)
+#No Drought - AIRS
+sm21=pd.concat([Air_SM1_M.loc['2010-01-26':'2012-02-14'],Air_SM1_M.loc['2019-02-19': ]])
+sm21['Period']= 'ND1'
+
+#Moderate Drought - COPR
+sm12=pd.concat([COPR_SM1_M.loc['2008-01-29':'2009-04-01'],COPR_SM1_M.loc['2009-10-27':'2010-01-26' ], 
+                COPR_SM1_M.loc['2012-02-14':'2013-04-30'], COPR_SM1_M.loc['2017-03-01':'2018-01-23']])
+sm12['Period']= 'MD'
+
+#Moderate Drought - AIRS
+sm22=pd.concat([Air_SM1_M.loc['2008-01-29':'2009-04-01'],Air_SM1_M.loc['2009-10-27':'2010-01-26' ], 
+                Air_SM1_M.loc['2012-02-14':'2013-04-30'], Air_SM1_M.loc['2017-03-01':'2018-01-23']])
+sm22['Period']= 'MD1'
+
+#Extreme Drought - COPR
+sm13=pd.concat([COPR_SM1_M.loc['2013-05-01':'2017-03-01'],COPR_SM1_M.loc['2018-01-23':'2019-02-19'],
+                COPR_SM1_M.loc['2007-05-01':'2008-01-29']])
+sm13['Period']= 'ED'
+
+#Extreme Drought - AIRS
+sm23=pd.concat([Air_SM1_M.loc['2013-05-01':'2017-03-01'],Air_SM1_M.loc['2018-01-23':'2019-02-19'],
+                Air_SM1_M.loc['2007-05-01':'2008-01-29']])
+sm23['Period']= 'ED1'
+SM = pd.concat([sm11,sm12,sm13,sm21,sm22,sm23], axis=0)
 #%%
-ndvi1 = NDVI_copr.loc['2008-01-01':'2011-12-31']
-ndvi1['Period'] ='PD'
+ndvi11 = pd.concat([ndvi_copr.loc['2010-01-26':'2012-02-14'],ndvi_copr.loc['2019-02-19': ]])
+ndvi11['Period']= 'ND'
 
-ndvi2=NDVI_copr.loc['2012-01-01':'2018-12-31']
-ndvi2['Period'] ='D'
+#No Drought - AIRS
+ndvi21=pd.concat([ndvi_airs.loc['2010-01-26':'2012-02-14'],ndvi_airs.loc['2019-02-19': ]])
+ndvi21['Period']= 'ND1'
 
-ndvi3 = NDVI_airs.loc['2008-01-01':'2011-12-31']
-ndvi3['Period'] ='PD1'
+#Moderate Drought - COPR
+ndvi12=pd.concat([ndvi_copr.loc['2008-01-29':'2009-04-01'],ndvi_copr.loc['2009-10-27':'2010-01-26' ], 
+                ndvi_copr.loc['2012-02-14':'2013-04-30'], ndvi_copr.loc['2017-03-01':'2018-01-23']])
+ndvi12['Period']= 'MD'
 
-ndvi4=NDVI_airs.loc['2012-01-01':'2018-12-31']
-ndvi4['Period'] ='D1'
+#Moderate Drought - AIRS
+ndvi22=pd.concat([ndvi_airs.loc['2008-01-29':'2009-04-01'],ndvi_airs.loc['2009-10-27':'2010-01-26' ], 
+                ndvi_airs.loc['2012-02-14':'2013-04-30'], ndvi_airs.loc['2017-03-01':'2018-01-23']])
+ndvi22['Period']= 'MD1'
 
-NDVI = pd.concat([ndvi1,ndvi2,ndvi3,ndvi4], axis=0)
+#Extreme Drought - COPR
+ndvi13=pd.concat([ndvi_copr.loc['2013-05-01':'2017-03-01'],ndvi_copr.loc['2018-01-23':'2019-02-19'],
+                ndvi_copr.loc['2007-05-01':'2008-01-29']])
+ndvi13['Period']= 'ED'
+
+#Extreme Drought - AIRS
+ndvi23=pd.concat([ndvi_airs.loc['2013-05-01':'2017-03-01'],ndvi_airs.loc['2018-01-23':'2019-02-19'],
+                ndvi_airs.loc['2007-05-01':'2008-01-29']])
+ndvi23['Period']= 'ED1'
+
+
+NDVI = pd.concat([ndvi11,ndvi12,ndvi13,ndvi21,ndvi22,ndvi23], axis=0)
 #%% Violinplot for SM and NDVI for PD and D
          
 fig=plt.figure()
 ax=fig.add_subplot(211)
-ax=sns.violinplot(x='Period', y='Saturation', data=SM,linewidth = 0.3, hue='Site', dodge=False)              
-              
+ax=sns.violinplot(x='Period', y='Saturation', data=SM,linewidth = 0.3,hue='Site', dodge=False)              
+ax.legend(frameon=False, fontsize='small')            
 ax1=fig.add_subplot(212)
-ax1=sns.violinplot(x='Period', y='median', data=NDVI, linewidth = 0.3, hue='Site', dodge=False)              
+ax1=sns.violinplot(x='Period', y='median', data=NDVI, linewidth = 0.3, hue='Site', dodge=False)
+ax1.legend(frameon=False, fontsize='small')            
+              
 #%% Violinplot for Net P
 
-Net_P = pd.read_csv("Infiltration_COPR070420.csv", sep=',') #COPR
-Net_P = pd.read_csv("Infiltration_AIR070420.csv", sep='\t') #AIRS
+Net_P = pd.read_csv("Infiltration_COPR180221.csv", sep=';') #COPR
+Net_P = pd.read_csv("Infiltration_AIR180221.csv", sep='\t') #AIRS
 
 Net_P['Date'] = pd.to_datetime(Net_P['Date'], utc=True)
 Net_P=Net_P.set_index(pd.DatetimeIndex(Net_P['Date'])) 
-Net_P = Net_P.resample('M').sum()
+Net_P = Net_P.resample('D').sum()
 Net_P['Date'] = pd.to_datetime(Net_P.index)
 Net_P = Net_P.loc['2007-10-01':]
 
@@ -328,75 +445,127 @@ def assign_wy(Net_P):
 
 Net_P['WY'] = Net_P.apply(lambda x: assign_wy(x), axis=1)
 Net_P['diff'] = (Net_P['Rain_mm_Tot'] - Net_P['PET']).groupby(Net_P['WY']).cumsum()
-#Net_P['Site'] = 'COPR'
+
+Net_P['Site'] = 'COPR'
+Net_P_copr=Net_P
+
 Net_P['Site'] = 'AIRS'
+Net_P_airs=Net_P
 #%%
-netp1 = Net_P.loc['2008-01-01':'2011-12-31'] #COPR
-netp1['Period'] ='PD' #COPR
+netP11 = pd.concat([Net_P_copr.loc['2010-01-26':'2012-02-14'],Net_P_copr.loc['2019-02-19': ]])
+netP11['Period']= 'ND'
 
-netp2=Net_P.loc['2012-01-01':'2018-12-31'] 
-netp2['Period'] ='D' 
+#No Drought - AIRS
+netP21=pd.concat([Net_P_airs.loc['2010-01-26':'2012-02-14'],Net_P_airs.loc['2019-02-19': ]])
+netP21['Period']= 'ND1'
 
-netp3 = Net_P.loc['2008-01-01':'2011-12-31']#AIRS
-netp3['Period'] ='PD1'
+#Moderate Drought - COPR
+netP12=pd.concat([Net_P_copr.loc['2008-01-29':'2009-04-01'],Net_P_copr.loc['2009-10-27':'2010-01-26' ], 
+                Net_P_copr.loc['2012-02-14':'2013-04-30'], Net_P_copr.loc['2017-03-01':'2018-01-23']])
+netP12['Period']= 'MD'
 
-netp4=Net_P.loc['2012-01-01':'2018-12-31']
-netp4['Period'] ='D1'
+#Moderate Drought - AIRS
+netP22=pd.concat([Net_P_airs.loc['2008-01-29':'2009-04-01'],Net_P_airs.loc['2009-10-27':'2010-01-26' ], 
+                Net_P_airs.loc['2012-02-14':'2013-04-30'], Net_P_airs.loc['2017-03-01':'2018-01-23']])
+netP22['Period']= 'MD1'
 
-NETP = pd.concat([netp1,netp2,netp3,netp4], axis=0)
-#%%
+#Extreme Drought - COPR
+netP13=pd.concat([Net_P_copr.loc['2013-05-01':'2017-03-01'],Net_P_copr.loc['2018-01-23':'2019-02-19'],
+                 Net_P_copr.loc['2007-05-01':'2008-01-29']])
+netP13['Period']= 'ED'
 
-ax=sns.violinplot(x='Period', y='diff', data=NETP,linewidth = 0.3, hue='Site', dodge=False)              
+#Extreme Drought - AIRS
+netP23=pd.concat([Net_P_airs.loc['2013-05-01':'2017-03-01'],Net_P_airs.loc['2018-01-23':'2019-02-19'],
+                Net_P_airs.loc['2007-05-01':'2008-01-29']])
+netP23['Period']= 'ED1'
+
+NETP = pd.concat([netP11,netP12,netP13,netP21,netP22,netP23], axis=0)
+#%%Violinplot of available P
+
+ax=sns.violinplot(x='Period', y='diff', data=NETP,linewidth = 0.3, hue='Site', dodge=False) 
+             
 #%% LIneplot for the differen NDVI years separately 
-n0=np.asarray(NDVI_copr['median'].loc['2010'])
-n1=np.asarray(NDVI_copr['median'].loc['2011'])
-n2=np.asarray(NDVI_copr['median'].loc['2015'])
-n3=np.asarray(NDVI_copr['median'].loc['2016'])
-n6=np.asarray(NDVI_copr['median'].loc['2019'])
+n0=np.asarray(ndvi_copr_m['median'].loc['2008']) #MD
+n1=np.asarray(ndvi_copr_m['median'].loc['2011']) #ND
+n2=np.asarray(ndvi_copr_m['median'].loc['2015']) #ED
+n3=np.asarray(ndvi_copr_m['median'].loc['2016']) #ED
+#n6=np.asarray(ndvi_copr_m['median'].loc['2019']) #ND
 
-na0=np.asarray(NDVI_airs['median'].loc['2010'])
-na1=np.asarray(NDVI_airs['median'].loc['2011'])
-na2=np.asarray(NDVI_airs['median'].loc['2015'])
-na3=np.asarray(NDVI_airs['median'].loc['2016'])
-na6=np.asarray(NDVI_airs['median'].loc['2019'])
+na0=np.asarray(ndvi_airs_m['median'].loc['2008'])
+na1=np.asarray(ndvi_airs_m['median'].loc['2011'])
+na2=np.asarray(ndvi_airs_m['median'].loc['2015'])
+na3=np.asarray(ndvi_airs_m['median'].loc['2016'])
+#na6=np.asarray(ndvi_airs_m['median'].loc['2019'])
 
+x_labels=['J','F','M','A','M','J','J','A','S','O','N','D']
+x=np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 plt.style.use('bmh')
 plt.subplot(211)
-plt.plot(n0, label='2010')
+plt.plot(n0, label='2008')
 plt.plot(n1, label='2011')
 plt.plot(n2, label='2015', linestyle='--')
 plt.plot(n3,label='2016', linestyle='--')
-plt.plot(n6,label='2019')
+#plt.plot(n6,label='2019')
 plt.ylim(0.15,0.8)
+plt.xticks(x,x_labels,fontsize='medium', fontweight='bold')
 plt.yticks(fontsize='medium', fontweight='bold')
-plt.xticks(fontsize='medium', fontweight='bold')
+plt.ylabel('NDVI', fontweight='bold',fontsize='medium')
+plt.axhline(0.3,color='black',linewidth=0.5)
 
 plt.legend()   
 plt.subplot(212)
-plt.plot(na0, label='2010')
+plt.plot(na0, label='2008')
 plt.plot(na1, label='2011')
 plt.plot(na2, label='2015',linestyle='--')
 plt.plot(na3,label='2016',linestyle='--')
-plt.plot(na6,label='2019')
+#plt.plot(na6,label='2019')
 plt.legend()
 plt.ylim(0.15,0.8)
 plt.yticks(fontsize='medium', fontweight='bold')
-plt.xticks(fontsize='medium', fontweight='bold')
+plt.xticks(x,x_labels,fontsize='medium', fontweight='bold')
+plt.ylabel('NDVI', fontweight='bold',fontsize='medium')
+plt.axhline(0.3,color='black',linewidth=0.5)
 
+#%% Regression plot SM and NDVI with browning threshold
+
+x=np.asarray(COPR_SM1_M['SM 1']).reshape(-1,1)
+y=np.asarray(ndvi_copr_m['median'].loc[:'2019-05']).reshape(-1,1)
+x1=np.asarray(Air_SM1_M['SM 1'].dropna()).reshape(-1,1)
+y1=np.asarray(ndvi_airs_m['median'].loc[(ndvi_airs_m.index < '2016-08-01') | (ndvi_airs_m.index > '2018-02-01')]).reshape(-1,1)
+
+reg=LinearRegression().fit(x,y)
+reg_pred=reg.predict(x)
+reg.score(x,y)
+ax=reg.coef_
+bx=reg.intercept_
+cx=(0.3-bx)/ax
+
+reg1=LinearRegression().fit(x1,y1)
+reg_pred1=reg.predict(x1)
+reg.score(x1,y1)
+ax1=reg1.coef_
+bx1=reg1.intercept_
+cx1=(0.3-bx1)/ax1
+
+#%%Scatter Plot with regression of SM and NDVI using browning threshold
+x1=np.asarray(Air_SM1_M['SM 1'].dropna())
+y1=np.asarray(ndvi_airs_m['median'].loc[(ndvi_airs_m.index < '2016-08-01') | (ndvi_airs_m.index > '2018-02-01')])
+
+slope, intercept, r_value, p_value, std_err = stats.linregress(x1,y1)
+
+plt.scatter(x,y,color='blue')
+plt.plot(x,reg_pred, color='red')
+plt.scatter(x1,y1,color='orange')
+sns.regplot(x1, y1,color='orange',
+      ci=None, label="y={0:.4f}x+{1:.4f}".format(slope, intercept))
+plt.axhline(0.3,color='black')
+plt.axvline(cx,color='black')
+plt.axvline(cx1,color='black')
+plt.ylabel('NDVI', font='medium',fontweight='bold')
+plt.xlabel('VMC (m $\mathregular{^3}$/ m $\mathregular{^3}$)',fontweight='bold', fontsize='medium' )
 #%%
 
-T1 = COPR_AT.assign(x=COPR_AT.index.strftime('%m-%d')) \
-             .query("'03-01' <= x <= '10-31'").drop('x',1)
-
-T1pd = T1['AT2'].loc['2008':'2011']
-T1d = T1['AT2'].loc['2012':'2018']
-
-T2 = Air_AT.assign(x=Air_AT.index.strftime('%m-%d')) \
-             .query("'03-01' <= x <= '10-31'").drop('x',1)
-
-T2pd = T2['AT2'].loc['2008':'2011']
-T2d = T2['AT2'].loc['2012':'2018']
-
+r=COPR_Rain_M['Rain_mm_Tot'].loc['2017-10':'2018-03']
 
 
 
