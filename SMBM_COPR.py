@@ -12,30 +12,25 @@ from numpy import genfromtxt
 from sklearn.linear_model import LinearRegression
 ######################## LOAD INPUT DATA  #####################################
 #%%Load formatted xls file
-data = pd.read_csv('Infiltration_COPR070420.csv', sep=',')
-data['Date'] = pd.to_datetime(data['Date'], utc=True)
-data=data.set_index(pd.DatetimeIndex(data['Date'])) 
-data = data.loc['2008-01-01':'2019-09-30']
-data['Date'] = pd.to_datetime(data['Date'])
+data = pd.read_csv('Infiltration_COPR180221.csv',index_col=[0],sep=';')
+data['Date'] = pd.to_datetime(data.index, utc=True)
 #Names of columns that we want
 varnames = ['Date', 'PET','Rain_mm_Tot']
 #Extract numpy arrays from variables in dataframe
-     
+data = data.loc['2007-10-13':] 
 
- #%%Read kc_copr file - no need to to run the whole NDVI script again. 
-#kc starts from 2008-01 until 2019-09 
- 
-kc_new = genfromtxt('kc_copr.csv', delimiter=',')
-kc_new=pd.DataFrame(kc_new)
-kc_new=kc_new.set_index(pd.DatetimeIndex(data['Date'])) 
-
-kc_new = np.asarray(kc_new.drop(data[data['PET'].isna()].index))
-
-data=data.dropna()
+data['PET'] =data['PET'].interpolate()
 series = [column.values for label, column in data[varnames].items()]
 #Make separate names for each - make new np array for calc
 Date, RET, Rain = series
 N = len(data.index) #Number of timesteps in simulation
+ #%%Read kc_copr file - no need to to run the whole NDVI script again. 
+#kc starts from 2008-01 until 2019-09 
+ 
+kc_new = pd.read_csv('kc_VI_copr.csv',index_col=[0], sep=',')
+kc_new=kc_new.set_index(pd.DatetimeIndex(data['Date'])) 
+kc_new=np.asarray(kc_new['median'])
+
 
 #%%######################## SOIL MOISTURE SIMULATION ############################
 #Allocate some arrays for results -size 1000 because of Monte Carlo
@@ -77,7 +72,7 @@ wp = genfromtxt('wp_copr.csv', delimiter=',')
 TAW =  (fc - wp) * Zr #* (1-B) + (fc - 0.5*wp)*Ze *B  #total available water (mm)
 RAW = Pc * TAW               #readily available water (mm)
 P = Rain   
-PET = RET * kc_new[0]  
+PET = RET * kc_new 
 
 #%%MODEL RUNS FROM OCTOBER 2007 - Sept 2019 as of 01.11.2019 
 
@@ -111,6 +106,8 @@ for i in range (1000):
                 SMD[t+1,i] = SMD[t,i]
         
         Theta[t,i] = fc[i] - SMD[t,i] / Zr[i] #to calculate SM from SMD
+        if t>0:
+            MB[t,i] = P[t-1] - AET[t-1,i] - D[t-1,i] + SMD[t,i] - SMD[t-1,i]
    
     print(i, SMD[:,i].min(), SMD[:,i].max()) 
     
@@ -119,7 +116,30 @@ SM_mod=pd.DataFrame(Theta)
 SM_mod.drop(SM_mod.tail(1).index,inplace=True)
 SM_mod = SM_mod.set_index(data.Date)
 SM_mod_M = SM_mod.resample('M').mean()
+
+SM_mod_c=pd.DataFrame(SM_mod_M[176])
+SM_mod_c=SM_mod_c.loc['2012':'2018']
+
 #SM_mod_M = SM_mod_M.dropna()
+#%%
+D_copr=pd.DataFrame(D[:,183])
+
+D_copr.drop(D_copr.tail(1).index,inplace=True)
+D_copr = D_copr.set_index(pd.DatetimeIndex(data['Date']))
+
+D_copr=D_copr.resample('M').sum()
+D_copr=D_copr.loc['2012':'2018']
+
+AET_copr=pd.DataFrame(AET[:,176])
+
+AET_copr.drop(AET_copr.tail(1).index,inplace=True)
+AET_copr= AET_copr.set_index(pd.DatetimeIndex(data['Date']))
+
+AET_copr=AET_copr.resample('M').sum()
+AET_copr=AET_copr.loc['2012':'2018']
+
+
+
 
 #%% Modelled SMD into a dataframe - original version is from Oct 2007
 cal_obs = np.asarray(COPR_SM1_M['SM 1'].loc['2008-01-01':'2013-12-31'])
@@ -130,11 +150,11 @@ cal_sim= np.asarray(SM_mod_M.loc['2008-01-01':'2013-12-31'])
 #cal_obs=np.compress(bad, a)  
 
 #%%
-bad = ~np.logical_or(np.isnan(np.asarray(COPR_SM1_M['SM 1'].loc['2014-01-01':'2019-08-31'])), 
-                     np.isnan(np.asarray(SM_mod_M.loc['2014-01-01':'2019-08-31'])[:,0]))
+bad = ~np.logical_or(np.isnan(np.asarray(COPR_SM1_M['SM 1'].loc['2014-01-01':'2019-05-31'])), 
+                     np.isnan(np.asarray(SM_mod_M.loc['2014-01-01':'2019-05-31'])[:,0]))
 
-val_obs=np.compress(bad, np.asarray(COPR_SM1_M['SM 1'].loc['2014-01-01':'2019-08-31'])) 
-val_sim =np.asarray(SM_mod_M.loc['2014-01-01':'2019-08-31'].dropna())
+val_obs=np.compress(bad, np.asarray(COPR_SM1_M['SM 1'].loc['2014-01-01':'2019-05-31'])) 
+val_sim =np.asarray(SM_mod_M.loc['2014-01-01':'2019-05-31'].dropna())
 
 
 #%% Kolmogorov Smirnoff test  to select models that follow same distribution as observed SM
@@ -247,45 +267,63 @@ for i in range(139): #139 is lenght of time series - stays fixed regardless of h
 #%% Find best GLUE Model 
 np.argmax(p_values_glue)
 p_values_glue.max()
+
+#find the NSE value at np.argmax(p_values_glue) same index 
  #then pick that model from GLUE array to plot 
 #%%Plotting standard deviation around the modelled soil moisture
 SM_c= np.concatenate((cal_obs,val_obs),axis=0)
-xaxis_c=(SM_mod_M.loc['2008-02-01':].dropna()).index
+xaxis_c=(SM_mod_M.loc['2008-01-01':'2019-05-31'].dropna()).index
 SM_c= (pd.DataFrame(SM_c)).set_index(pd.DatetimeIndex((xaxis_c)))
 
-best_model_c = (GLUE_models_c[47]).T #chose on base of p_value, is from Feb 2008 - Oct 2019, with no Oct 2017
+best_model_c = (GLUE_models_c[19]).T #chose on base of p_value, is from Feb 2008 - Oct 2019, with no Oct 2017
 best_model_c= (pd.DataFrame(best_model_c)).set_index(pd.DatetimeIndex((xaxis_c)))
 
-#%% Standard deviation of all the 1000 Models
-SM_mod_M_std = SM_mod_M.std(axis=1)
-SM_mod_M_std=SM_mod_M_std[SM_mod_M_std.index.isin(best_model_c.index)] 
+#%% Convert to Saturation 
 
-SM_std_air=SM_mod_airs_M.std(axis=1)
-SM_std_air=SM_std_air[SM_std_air.index.isin(pd.DataFrame(GLUE_models_c[10]).index)] 
+por1=0.71
+por2=0.34
+c_sm = pd.DataFrame((best_model_c[0]/por1)*100) #best fit COPR
+a_sm = pd.DataFrame((SM_mod_airs_M[192]/por2)*100) #best fit AIRS
 
-stats.pearsonr(best_model_c[0], SM_c[0]) #R2 = 0.80 at 0.001 COPR
-stats.pearsonr(best_model[0], SM_air[0]) #R2 = 0.83 at 0.001 AIRS
+c_sm_h = pd.DataFrame((SM_c/por1)*100) #historic COPR
+a_sm_h = pd.DataFrame((SM_air/por2)*100) #historic AIRS
+
+#Standard deviation for models 
+c_std = pd.DataFrame(((SM_mod_M/por1)*100).std(axis=1)) #copr
+c_std=c_std[c_std.index.isin(c_sm.index)] 
+
+a_std=pd.DataFrame(((SM_mod_airs_M/por2)*100).std(axis=1))
+a_std=a_std[a_std.index.isin(a_sm.index)] 
+
+stats.pearsonr(best_model_c[0], SM_c[0]) #R2 = 0.84 at 0.001 COPR
+stats.pearsonr(best_model_a[0], SM_air[0]) #R2 = 0.82 at 0.001 AIRS
+
 
 #%% plots AIRS and COPR models together 
 
+#x_labels=['2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019']
+#x=np.array([0,1,2,3,4,5,6,7,8,9,10,11])
+
+
+plt.style.use('bmh')
 fig=plt.figure()
 plt.subplot(211)
-plt.plot(best_model_c[0], color='black', label='Best Fit', linestyle='--' )
-plt.fill_between(SM_mod_M_std.index,best_model_c[0] + SM_mod_M_std, best_model_c[0] - SM_mod_M_std, color = 'grey', alpha = 0.6)
-plt.axhline(0.13, color='grey')
-plt.plot(SM_c, color='blue', label='Observed')
+plt.plot(c_sm, color='black', label='Best Fit', linestyle='--' ) #best fit 
+plt.fill_between(c_std.index,c_sm[0] + c_std[0], c_sm[0] - c_std[0], color = 'grey', alpha = 0.6)
+#plt.axhline(0.13, color='grey')
+plt.plot(c_sm_h, color='blue', label='Observed')
 plt.yticks(fontsize='medium')
-plt.ylabel('VMC (m $\mathregular{^3}$/ m $\mathregular{^3}$)', fontsize='medium', fontweight='bold')
-plt.ylim(0.05,0.5)
+plt.ylabel('Saturation (%)', fontsize='medium', fontweight='bold')
+plt.ylim(0,100)
 
 plt.subplot(212)
-plt.plot(SM_air, color='orange', label='_nolegend_') #observed SM
-plt.plot(SM_mod_airs_M[199], color='black', label='Best Fit',linestyle='--' ) #best model
-plt.axhline(0.07, color = 'grey')
-plt.fill_between(SM_std_air.index,SM_mod_airs_M[199] + SM_std_air, SM_mod_airs_M[199] - SM_std_air, color = 'grey', alpha = 0.6)
+plt.plot(a_sm_h, color='orange', label='_nolegend_') #observed SM
+plt.plot(a_sm, color='black', label='Best Fit',linestyle='--' ) #best model
+#plt.axhline(0.07, color = 'grey')
+plt.fill_between(a_std.index,a_sm[192] + a_std[0], a_sm[192] - a_std[0], color = 'grey', alpha = 0.6)
 plt.yticks(fontsize='medium')
-plt.ylabel('VMC (m $\mathregular{^3}$/ m $\mathregular{^3}$)', fontsize='medium', fontweight='bold')
-plt.ylim(0,0.3)
+plt.ylabel('Saturation (%)', fontsize='medium', fontweight='bold')
+plt.ylim(0,100)
 
 fig.legend(fontsize='x-small', ncol= 4, loc ='lower center', frameon=False)
 
@@ -302,11 +340,11 @@ plt.xticks(fontsize='large')
 plt.yticks(fontsize='large')
 plt.xlabel('VMC (m $\mathregular{^3}$/ m $\mathregular{^3}$)',fontweight='bold', fontsize='large' )
 sns.kdeplot(np.asarray(SM_air[0]), color='orange')
+sns.kdeplot(best_model_a[0], color='black')
 plt.ylabel('KDE', fontweight='bold', fontsize='large')
 plt.xticks(fontsize='large')
 plt.yticks(fontsize='large')
 plt.xlabel('VMC (m $\mathregular{^3}$/ m $\mathregular{^3}$)',fontweight='bold', fontsize='large' )
-sns.kdeplot(best_model[0], color='black')
 
 #sns.kdeplot(ox,GLUE_models[161].T)
 #%% 
