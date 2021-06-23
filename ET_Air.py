@@ -24,43 +24,76 @@ Air_data = Air_data.set_index('Date')
 # Convert UTC to PST
 Air_data=Air_data.tz_localize('UTC')
 Air_data=Air_data.tz_convert('US/Pacific')
-Air_data = Air_data[(Air_data.index > '2007-12-01')]
+Air_data = Air_data[(Air_data.index > '2007-10-01')]
 
 Air_data[Air_data == 'NAN'] = np.nan
+Air_data=Air_data.dropna()
 
 for col in list(Air_data.columns):
         Air_data[col] = pd.to_numeric(Air_data[col])
 
 #Air_data.drop(Air_data.columns[16:66], axis=1, inplace=True)
 
-Air_Rain = Air_data['Rain_mm_Tot'].resample('D').sum()
-Air_Rain = Air_Rain.loc['2007-12-01':'2019-09-30']
+Air_data=Air_data.resample('D').mean()
+
+#Air_data = Air_data.loc['2011-10-01':'2018-12-31'] #for CCS calc. 
+
+#%%########################PENMAN MONTHEITH CALCULATION FOR PET##################
+#%%
+gradient=pd.DataFrame([2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,
+                       2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='M')
+gradient=gradient.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+gradient['month']=gradient.index.month
+gradient['Date'] = pd.to_datetime(gradient.index)
 
 #%%########################PENMAN MONTHEITH CALCULATION FOR PET##################
 
+AT1=pd.DataFrame(Air_data['AirTC_1_Avg'])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='D')
+AT1=AT1.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+AT1['Date'] = pd.to_datetime(AT1.index)
+AT1 = pd.merge(AT1,gradient, left_on=AT1['Date'].apply(lambda x: (x.year, x.month)),
+         right_on=gradient['Date'].apply(lambda y: (y.year, y.month)),
+         how='outer')[['AirTC_1_Avg',0]]
+AT1=AT1.set_index(pd.DatetimeIndex(Air_data.index)) #upsampling to daily values 
+
+AT1['AT_new']=AT1['AirTC_1_Avg']+AT1[0]
+
+AT2=pd.DataFrame(Air_data['AirTC_2_Avg'])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='D')
+AT2=AT2.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+AT2['Date'] = pd.to_datetime(AT2.index)
+AT2 = pd.merge(AT2,gradient, left_on=AT2['Date'].apply(lambda x: (x.year, x.month)),
+         right_on=gradient['Date'].apply(lambda y: (y.year, y.month)),
+         how='outer')[['AirTC_2_Avg',0]]
+AT2=AT2.set_index(pd.DatetimeIndex(Air_data.index)) #upsampling to daily values 
+
+AT2['AT_new']=AT2['AirTC_2_Avg']+AT2[0]
+
+AT1=AT1['AT_new']
+AT2=AT2['AT_new']
+
+#%%
 #Saturation Vapour Pressure 
-AT1=Air_data['AirTC_1_Avg'] + 2.0
+AT1=Air_data['AirTC_1_Avg'] 
 #AT1 = (AT1.ffill()+AT1.bfill())/2
 #AT1 = AT1.bfill().ffill()
 
-AT2=Air_data['AirTC_2_Avg'] + 2.0
+AT2=Air_data['AirTC_2_Avg'] 
 #AT2 = (AT2.ffill()+AT2.bfill())/2
 #AT2 = AT2.bfill().ffill()
-
+#%%
 
 Es1=0.61078*np.exp(17.269*AT1/(AT1+237.3))
 Es2=0.61078*np.exp(17.269*AT2/(AT2+237.3))
 
 #Actual Vapour Pressure
-RH1=Air_data['RH_avg_1']
-#RH1 = (RH1.ffill()+RH1.bfill())/2
-#RH1 = RH1.bfill().ffill()
 
 RH2=Air_data['RH_avg_2']
-#RH2 = (RH2.ffill()+RH2.bfill())/2
-#RH2 = RH2.bfill().ffill()
+#RH2=RH2.interpolate()
 
-Ea1=(Es1 * RH1) / 100
+Ea1=(Es1 * RH2) / 100
 Ea2=(Es2 * RH2) / 100
 
 #Vapour Pressure Deficit 
@@ -151,22 +184,29 @@ PET_air[PET_air1 < 0] = 0
 plt.plot(PET_air1)
 
 #%%dAILY CROP EVAPOTRANSPIRATION
-PET_air=LET*ts/1000/LV*1000 #after Dars calculation 
+
+PET_air=LET*86400/1000/LV*1000 #after Dars calculation (900 for 15 min, 9000 for 25 hours)
+
 PET_air=pd.DataFrame(PET_air)
 PET_air.columns=['PET']
 PET_air['PET'][PET_air['PET'] < 0] = 0
-PET_air = PET_air.resample('D').sum()
-#PET_air_M = PET_air['PET'].resample('M').sum()
-#PET_air = PET_air.loc['2007-12-01':'2019-09-30']
+#PET_air = PET_air.resample('D').sum()
+PET_air=PET_air[["PET"]].astype(float).replace(0,np.nan)
+#PET_all['Date'] = pd.to_datetime(PET_all.index)
+
+
+PET_air=PET_air.interpolate(method='time')
+
+
 
 #%%
 
-PET_air.to_csv("ET_AIR_CC.csv",sep='\t')
+PET_air.to_csv("RET_AIR_CCS.csv",sep=';',date_format='%Y-%m-%d')
 #
 #%%Infiltration
 I_AIR=pd.concat([PET_air, Air_Rain], axis=1)
 #I_AIR = I_AIR.resample('D').sum()
-I_AIR.to_csv("Infiltration_AIR020620.csv", sep='\t')
+I_AIR.to_csv("Infiltration_AIR180221.csv", sep='\t')
 
 
 

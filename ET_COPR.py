@@ -18,29 +18,76 @@ COPR_data.rename(columns={'TIMESTAMP': 'Date'}, inplace=True)
 
 #Convert Date to Index
 COPR_data=COPR_data.set_index(pd.DatetimeIndex(COPR_data['Date'])) 
+COPR_data['Date'] = pd.to_datetime(COPR_data.index)
 
 # Convert UTC to PST
 COPR_data=COPR_data.tz_localize('UTC')
 COPR_data=COPR_data.tz_convert('US/Pacific')
 #COPR_data = COPR_data[(COPR_data.index > '2007-06-01')]
-COPR_data = COPR_data.loc['2007-12-01':'2019-09-30']
+#COPR_data = COPR_data.loc['2011-10-01':'2018-12-31'] #for CCS calc. 
 
+COPR_data =COPR_data.loc['2007-10-01':]
 COPR_data[COPR_data == 'NAN'] = np.nan
 
 for col in list(COPR_data.columns):
         COPR_data[col] = pd.to_numeric(COPR_data[col])
 COPR_data['Date'] = pd.to_datetime(COPR_data['Date'])
 
+COPR_data = COPR_data.resample('D').mean()
+
+COPR_data=COPR_data.interpolate()
+
+#for CCS scenarios cut data to 2012-2018
+
+COPR_data = COPR_data.loc['2011-10-01':'2018-12-31'] #for CCS calc. 
+
+
+#%%Rain
+
 COPR_Rain = COPR_data['Rain_mm_Tot'].resample('D').sum()
-COPR_Rain = COPR_Rain.loc['2007-12-01':'2019-09-30']
+#COPR_Rain = COPR_Rain.loc['2007-10-01':'2019-09-30']
+
+#%%
+gradient=pd.DataFrame([2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2,
+                       2,3,4,5,6,6,6,6,4,2,2,2,2,3,4,5,6,6,6,6,4,2,2,2])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='M')
+gradient=gradient.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+gradient['month']=gradient.index.month
+gradient['Date'] = pd.to_datetime(gradient.index)
 
 #%%########################PENMAN MONTHEITH CALCULATION FOR PET##################
 
+AT1=pd.DataFrame(COPR_data['AirTC_1_Avg'])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='D')
+AT1=AT1.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+AT1['Date'] = pd.to_datetime(AT1.index)
+AT1 = pd.merge(AT1,gradient, left_on=AT1['Date'].apply(lambda x: (x.year, x.month)),
+         right_on=gradient['Date'].apply(lambda y: (y.year, y.month)),
+         how='outer')[['AirTC_1_Avg',0]]
+AT1=AT1.set_index(pd.DatetimeIndex(COPR_data.index)) #upsampling to daily values 
+
+AT1['AT_new']=AT1['AirTC_1_Avg']+AT1[0]
+
+AT2=pd.DataFrame(COPR_data['AirTC_2_Avg'])
+idx=pd.date_range('10-01-2011','12-31-2018',freq='D')
+AT2=AT2.set_index(pd.DatetimeIndex(idx)) #upsampling to daily values 
+AT2['Date'] = pd.to_datetime(AT2.index)
+AT2 = pd.merge(AT2,gradient, left_on=AT2['Date'].apply(lambda x: (x.year, x.month)),
+         right_on=gradient['Date'].apply(lambda y: (y.year, y.month)),
+         how='outer')[['AirTC_2_Avg',0]]
+AT2=AT2.set_index(pd.DatetimeIndex(COPR_data.index)) #upsampling to daily values 
+
+AT2['AT_new']=AT2['AirTC_2_Avg']+AT2[0]
+
+AT1=AT1['AT_new']
+AT2=AT2['AT_new']
+
+#%%
+
+AT1=COPR_data['AirTC_1_Avg']
+AT2=COPR_data['AirTC_2_Avg']
 #Saturation Vapour Pressure 
-AT1=COPR_data['AirTC_1_Avg'] + 4.0
-AT2=COPR_data['AirTC_2_Avg'] +4.0
-
-
+#%%
 Es1=0.61078*np.exp(17.269*AT1/(AT1+237.3))
 Es2=0.61078*np.exp(17.269*AT2/(AT2+237.3))
 
@@ -149,23 +196,22 @@ AET_b = RET_b.resample('D').sum()
 
 #%%Potential Crop Evapotranspiration with resistance parameters etc
 
-PET=LET*900/1000/LV*1000 #after Dars calculation 
+PET=LET*86400/1000/LV*1000 #after Dars calculation (900 for 15 min, 9000 for 25 hours)
 
 #%%CROP EVAPORATION 
 PET_all=pd.DataFrame(PET)
 PET_all.columns=['PET']
-PET_all=PET_all.set_index(pd.DatetimeIndex(COPR_data.index)) #creates the Index based on Date
-PET_all=PET_all.loc['2007-12-01':'2019-09-30']
-PET_all['PET'][PET_all['PET'] < 0] = 0 
+#PET_all=PET_all.set_index(pd.DatetimeIndex()) 
+#PET_all['PET'][PET_all['PET'] < 0] = 0 
+#PET_all = PET_all.resample('D').sum()
+#PET_all=PET_all[["PET"]].astype(float).replace(0,np.nan)
+#PET_all['Date'] = pd.to_datetime(PET_all.index)
 
 
-#AET_all = AET_all.loc['2008-01-01':'2018-12-31']
-PET_all = PET_all.resample('M').sum()
-PET_all = PET_all.mask(PET_all['PET'].between(0,0.01))
-PET_all['Date'] = pd.to_datetime(PET_all.index)
-#PET_all_M = PET_all['PET'].resample('M').sum()
+#PET_all=PET_all.interpolate(method='time')
+
 #%%
-PET_all.to_csv("ET_COPR_CC.csv",sep='\t')
+PET_all.to_csv("RET_COPR_CCS.csv",sep=';' ,date_format='%Y-%m-%d')
 
 #%% Reference ET from grass surface (ET0/PET) daily timestep
 
@@ -181,45 +227,9 @@ RET=(0.408*delta*(Rnet+G)+((pc*900*VPD*u2)/(AT2+273)))/(delta+pc*(1+0.34*u2))
 #%% Dataset of PET and RAIN to be used for Bucket model - 15 min interval 
 
 I_COPR=pd.concat([PET_all, COPR_Rain], axis=1)
-I_COPR.to_csv("Infiltration_COPR020620.csv", sep='\t')
-
-
-#%%Cumulative P minus ET to show moisture deficit  - input data is in DAILY format 
-#CWBI = sum(P-ET0)
-
-I_COPR = pd.read_csv("Infiltration_COPR311019.csv", sep='\t')
-I_COPR['Date'] = pd.to_datetime(I_COPR['Date'])
-I_COPR=I_COPR.set_index(pd.DatetimeIndex(I_COPR['Date'])) 
-I_COPR = I_COPR.resample('M').sum()
-I_COPR = I_COPR.loc['2007-10-01' : '2019-09-30']
-I_COPR['Year'] = I_COPR.index.year
-I_COPR['NET_P'] = (I_COPR['Rain'] - I_COPR['AET']).groupby(I_COPR['Year']).cumsum()
-
-I_AIRS = pd.read_csv("Infiltration_AIR011119.csv", sep='\t')
-I_AIRS['Date'] = pd.to_datetime(I_AIRS['Date'])
-I_AIRS=I_AIRS.set_index(pd.DatetimeIndex(I_AIRS['Date'])) 
-I_AIRS = I_AIRS.resample('M').sum()
-I_AIRS = I_AIRS.loc['2007-10-01' : '2019-09-30']
-I_AIRS['Year'] = I_AIRS.index.year
-I_AIRS['NET_P'] = (I_AIRS['Rain'] - I_AIRS['AET']).groupby(I_AIRS['Year']).cumsum()
-
-
+I_COPR.to_csv("Infiltration_COPR180221.csv", sep=';') #updated 18.02.21
 
 #%%
-fig = plt.figure()
-plt.plot(I_COPR['NET_P'], color = 'blue', label = 'Coastal')
-plt.plot(I_AIRS['NET_P'], color ='orange', label ='Inland')
-plt.axhline(0, color = 'red', alpha=0.8)
-plt.ylabel('P - PET (mm/yr)', fontsize='large', fontweight='bold')
-plt.yticks(fontsize='medium')
-plt.xticks(pd.date_range('2008','2019', freq='AS'), fontsize='medium')
-plt.axvspan('2012-01-01', '2019-01-01', color = 'grey', alpha = 0.3)
-fig.legend(fontsize='x-small', ncol= 3, loc ='lower center', frameon=False)
-plt.show()
-
-
-
-
 
 
 
